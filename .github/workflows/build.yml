@@ -37,20 +37,27 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
-      # media_kit's CMake downloads ANGLE.7z from a release URL that keeps
-      # returning 504. Fetch it through the API instead; CMake skips its own
-      # download when a file with the expected MD5 is already in place.
-      - name: Prefetch ANGLE for media_kit
+      # media_kit's CMake downloads its prebuilt archives from release URLs
+      # that keep returning 504. Fetch them through the API instead; CMake
+      # skips its own download when a file with the expected MD5 is in place.
+      - name: Prefetch media_kit archives
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $repo = 'alexmercerind/flutter-windows-ANGLE-OpenGL-ES'
-          $id = gh api "repos/$repo/releases/tags/v1.0.1" --jq '.assets[] | select(.name=="ANGLE.7z") | .id'
+          $archives = @(
+            @{ repo = 'alexmercerind/flutter-windows-ANGLE-OpenGL-ES'; tag = 'v1.0.1'; name = 'ANGLE.7z'; md5 = 'e866f13e8d552348058afaafe869b1ed' },
+            @{ repo = 'media-kit/libmpv-win32-video-build'; tag = '2023-09-24'; name = 'mpv-dev-x86_64-20230924-git-652a1dd.7z'; md5 = 'a832ef24b3a6ff97cd2560b5b9d04cd8' }
+          )
           New-Item -ItemType Directory -Force build/windows/x64 | Out-Null
-          curl.exe -fsSL --retry 3 -H "Authorization: Bearer $env:GH_TOKEN" -H 'Accept: application/octet-stream' -o build/windows/x64/ANGLE.7z "https://api.github.com/repos/$repo/releases/assets/$id"
-          $md5 = (Get-FileHash -Algorithm MD5 build/windows/x64/ANGLE.7z).Hash.ToLower()
-          if ($md5 -ne 'e866f13e8d552348058afaafe869b1ed') { throw "ANGLE.7z MD5 mismatch: $md5" }
+          foreach ($a in $archives) {
+            $out = "build/windows/x64/$($a.name)"
+            $filter = '.assets[] | select(.name == "' + $a.name + '") | .id'
+            $id = gh api "repos/$($a.repo)/releases/tags/$($a.tag)" --jq $filter
+            curl.exe -fsSL --retry 3 -H "Authorization: Bearer $env:GH_TOKEN" -H 'Accept: application/octet-stream' -o $out "https://api.github.com/repos/$($a.repo)/releases/assets/$id"
+            $md5 = (Get-FileHash -Algorithm MD5 $out).Hash.ToLower()
+            if ($md5 -ne $a.md5) { throw "$($a.name) MD5 mismatch: $md5" }
+          }
       - run: flutter build windows --release
       - name: Zip build
         shell: pwsh
