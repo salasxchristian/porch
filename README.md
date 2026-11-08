@@ -30,10 +30,22 @@ Porch uses the Home Assistant WebSocket API with a long-lived access token: it l
 
 Flutter can't build Windows apps from macOS, so GitHub Actions does it (`.github/workflows/build.yml`):
 
-- Every push to `main` builds a `Porch-windows-x64` zip, available as a workflow artifact.
-- Pushing a `v*` tag also attaches the zip to a GitHub release.
+- Every push to `main` builds `PorchSetup-<version>.exe` and a zip, available as the `Porch-windows-x64` workflow artifact.
+- Pushing a `v*` tag publishes them as a GitHub release.
 
-To install, unzip it on the Windows PC and run `porch.exe`.
+media_kit's build downloads two prebuilt archives from GitHub release links that often answer 504, so the workflow fetches them through the GitHub API first.
+
+### Releasing and updates
+
+Set `version:` in `pubspec.yaml`, commit, push, then push the matching tag (the workflow fails if they differ):
+
+```sh
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+Porch checks this repo's latest release when it opens and every 12 hours. A newer version shows an "Update available" card in the sidebar and in Settings > Updates. On Windows, Install downloads the installer, runs it silently, and Porch reopens on the new version. The installer is per-user, so it never asks for admin. The Mac build only links to the release.
+
+The first install on a PC is by hand: run `PorchSetup-<version>.exe` from the release.
 
 ## Secrets
 

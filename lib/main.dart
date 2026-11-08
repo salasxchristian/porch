@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import 'app_scope.dart';
 import 'cameras/camera_store.dart';
@@ -7,6 +8,7 @@ import 'ha/ha_client.dart';
 import 'settings/app_settings.dart';
 import 'shell.dart';
 import 'theme.dart';
+import 'update/updater.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -15,7 +17,11 @@ Future<void> main() async {
   final cameras = await CameraStore.open();
   final ha = HaClient();
   ha.connect(settings.haUrl, settings.haToken);
-  runApp(PorchApp(settings: settings, cameras: cameras, ha: ha));
+  final info = await PackageInfo.fromPlatform();
+  final updater = Updater(currentVersion: info.version)..start();
+  runApp(
+    PorchApp(settings: settings, cameras: cameras, ha: ha, updater: updater),
+  );
 }
 
 class PorchApp extends StatefulWidget {
@@ -24,12 +30,14 @@ class PorchApp extends StatefulWidget {
     required this.settings,
     required this.cameras,
     required this.ha,
+    required this.updater,
     this.useGoogleFonts = true,
   });
 
   final AppSettings settings;
   final CameraStore cameras;
   final HaClient ha;
+  final Updater updater;
   final bool useGoogleFonts;
 
   @override
@@ -52,6 +60,7 @@ class _PorchAppState extends State<PorchApp> {
       ha: widget.ha,
       cameras: widget.cameras,
       page: _page,
+      updater: widget.updater,
       child: ListenableBuilder(
         listenable: widget.settings,
         builder: (context, _) => MaterialApp(

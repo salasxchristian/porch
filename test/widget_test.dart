@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:porch/ha/ha_client.dart';
 import 'package:porch/main.dart';
 import 'package:porch/settings/app_settings.dart';
 import 'package:porch/theme.dart';
+import 'package:porch/update/updater.dart';
 import 'package:porch/widgets/device_details.dart';
 
 import '../tool/fake_ha_server.dart';
@@ -30,7 +32,7 @@ void main() {
     tmp.deleteSync(recursive: true);
   });
 
-  Future<void> pumpApp(WidgetTester tester) async {
+  Future<void> pumpApp(WidgetTester tester, {Updater? updater}) async {
     tester.view.physicalSize = const Size(1440, 1000);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -39,6 +41,7 @@ void main() {
         settings: settings,
         cameras: cameras,
         ha: ha,
+        updater: updater ?? Updater(currentVersion: '0.1.0'),
         useGoogleFonts: false,
       ),
     );
@@ -232,5 +235,64 @@ void main() {
         0,
       );
     });
+  });
+
+  testWidgets('a newer release shows an update card', (tester) async {
+    // Widget tests answer every HTTP request with 400; this one talks to a
+    // local server instead.
+    final overrides = HttpOverrides.current;
+    HttpOverrides.global = null;
+    addTearDown(() => HttpOverrides.global = overrides);
+    late HttpServer server;
+    late Updater updater;
+    File? ran;
+    await tester.runAsync(() async {
+      server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final base = 'http://127.0.0.1:${server.port}';
+      server.listen((request) async {
+        if (request.uri.path == '/latest') {
+          request.response.write(
+            jsonEncode({
+              'tag_name': 'v0.2.0',
+              'html_url': '$base/page',
+              'body': 'Faster cameras',
+              'assets': [
+                {
+                  'name': 'PorchSetup-0.2.0.exe',
+                  'browser_download_url': '$base/setup.exe',
+                },
+              ],
+            }),
+          );
+        } else {
+          request.response.add([1, 2, 3]);
+        }
+        await request.response.close();
+      });
+      updater = Updater(
+        currentVersion: '0.1.0',
+        latestReleaseApi: Uri.parse('$base/latest'),
+        installsInApp: true,
+        runInstaller: (file) async => ran = file,
+      );
+      await updater.check();
+    });
+    addTearDown(() => tester.runAsync(() => server.close(force: true)));
+    addTearDown(updater.dispose);
+
+    await pumpApp(tester, updater: updater);
+    expect(find.text('Update available'), findsOneWidget);
+    expect(find.text('Porch 0.2.0'), findsOneWidget);
+
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    expect(find.text('Porch 0.2.0 is out. You have 0.1.0.'), findsOneWidget);
+    expect(find.text('Faster cameras'), findsOneWidget);
+
+    await tester.runAsync(() => updater.install());
+    await tester.pump();
+    expect(ran, isNotNull);
+    expect(find.text('Installing update'), findsOneWidget);
+    await tester.runAsync(() => ran!.parent.delete(recursive: true));
   });
 }

@@ -7,6 +7,7 @@ import 'home/home_page.dart';
 import 'rooms/rooms_page.dart';
 import 'settings/settings_page.dart';
 import 'theme.dart';
+import 'update/updater.dart';
 import 'widgets/common.dart';
 
 /// Sidebar plus the page it selects. Pages are rebuilt on each switch so
@@ -84,6 +85,7 @@ class _Sidebar extends StatelessWidget {
           const SizedBox(height: 6),
           item(PorchPage.rooms, Icons.lightbulb_outline, 'Rooms'),
           const Spacer(),
+          const _UpdateCard(),
           item(PorchPage.settings, Icons.tune, 'Settings'),
           const SizedBox(height: 10),
           const _ConnectionCard(),
@@ -197,6 +199,93 @@ class _ConnectionCard extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Offers a newer version when one is out, and shows the download.
+class _UpdateCard extends StatelessWidget {
+  const _UpdateCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.porch;
+    final updater = AppScope.of(context).updater;
+    return ListenableBuilder(
+      listenable: updater,
+      builder: (context, _) {
+        final release = updater.latest;
+        if (release == null ||
+            !const {
+              UpdateState.available,
+              UpdateState.downloading,
+              UpdateState.installing,
+            }.contains(updater.state)) {
+          return const SizedBox();
+        }
+        final (title, detail) = switch (updater.state) {
+          UpdateState.downloading => (
+            'Downloading update',
+            '${(updater.progress * 100).round()}%',
+          ),
+          UpdateState.installing => (
+            'Installing update',
+            'Porch will close and reopen.',
+          ),
+          _ => ('Update available', 'Porch ${release.version}'),
+        };
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: p.onSoft,
+              border: Border.all(color: p.onBorder),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.system_update_alt, size: 18, color: p.pillInk),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(detail, style: TextStyle(fontSize: 12, color: p.muted)),
+                const SizedBox(height: 10),
+                if (updater.state == UpdateState.available)
+                  FilledButton(
+                    onPressed: updater.install,
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 36),
+                    ),
+                    child: Text(updater.installsInApp ? 'Install' : 'Get it'),
+                  )
+                else
+                  LinearProgressIndicator(
+                    value: updater.state == UpdateState.downloading
+                        ? updater.progress
+                        : null,
+                    color: p.accent,
+                    backgroundColor: p.track,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+              ],
+            ),
           ),
         );
       },

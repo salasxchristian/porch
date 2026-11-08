@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'cameras/camera_store.dart';
 import 'ha/ha_client.dart';
 import 'settings/app_settings.dart';
+import 'update/updater.dart';
 
 enum PorchPage { home, cameras, rooms, settings }
 
@@ -14,6 +15,7 @@ class AppScope extends InheritedWidget {
     required this.ha,
     required this.cameras,
     required this.page,
+    required this.updater,
     required super.child,
   });
 
@@ -23,6 +25,8 @@ class AppScope extends InheritedWidget {
 
   /// The sidebar page that is showing.
   final ValueNotifier<PorchPage> page;
+
+  final Updater updater;
 
   static AppScope of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<AppScope>()!;

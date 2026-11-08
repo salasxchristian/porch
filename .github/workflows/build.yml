@@ -58,16 +58,42 @@ jobs:
             $md5 = (Get-FileHash -Algorithm MD5 $out).Hash.ToLower()
             if ($md5 -ne $a.md5) { throw "$($a.name) MD5 mismatch: $md5" }
           }
+      - name: Version
+        id: v
+        shell: bash
+        run: |
+          p="$(sed -n 's/^version: *\([^+]*\).*/\1/p' pubspec.yaml)"
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            v="${GITHUB_REF_NAME#v}"
+            # The updater compares the app's pubspec version with the tag.
+            if [[ "$p" != "$v" ]]; then
+              echo "::error::Tag v$v but pubspec.yaml says $p"
+              exit 1
+            fi
+          else
+            v="$p-${GITHUB_SHA::7}"
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
       - run: flutter build windows --release
-      - name: Zip build
+      - name: Zip and installer
         shell: pwsh
-        run: Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath Porch-windows-x64.zip
+        run: |
+          $v = '${{ steps.v.outputs.version }}'
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Compress-Archive -Path build/windows/x64/runner/Release/* -DestinationPath "dist/Porch-$v-windows-x64.zip"
+          if (-not (Get-Command iscc -ErrorAction SilentlyContinue)) { choco install innosetup -y --no-progress }
+          $iscc = (Get-Command iscc -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) { $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          & $iscc "/DAppVersion=$v" windows\installer.iss
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
+          Copy-Item build\installer\*.exe dist\
       - uses: actions/upload-artifact@v4
         with:
           name: Porch-windows-x64
-          path: Porch-windows-x64.zip
-      - name: Attach to release
+          path: dist/*
+      - name: Publish release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: Porch-windows-x64.zip
+          files: dist/*
+          generate_release_notes: true

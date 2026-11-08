@@ -5,6 +5,7 @@ import '../cameras/camera_editor.dart';
 import '../ha/ha_client.dart';
 import '../ha/ha_entity.dart';
 import '../theme.dart';
+import '../update/updater.dart';
 import '../widgets/common.dart';
 import 'app_settings.dart';
 
@@ -24,6 +25,8 @@ class SettingsPage extends StatelessWidget {
         _Constrained(child: _ConnectionSection()),
         SizedBox(height: 20),
         _Constrained(child: _CamerasSection()),
+        SizedBox(height: 20),
+        _Constrained(child: _UpdatesSection()),
       ],
     );
   }
@@ -663,6 +666,91 @@ class _CamerasSection extends StatelessWidget {
               onPressed: () => showManageCameras(context, store),
               child: const Text('Manage cameras'),
             ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _UpdatesSection extends StatelessWidget {
+  const _UpdatesSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.porch;
+    final updater = AppScope.of(context).updater;
+    return PorchCard(
+      padding: const EdgeInsets.all(24),
+      child: ListenableBuilder(
+        listenable: updater,
+        builder: (context, _) {
+          final current = updater.currentVersion;
+          final release = updater.latest;
+          final description = switch (updater.state) {
+            UpdateState.checking => 'Checking GitHub for a new version.',
+            UpdateState.upToDate => 'Porch $current is the latest version.',
+            UpdateState.available =>
+              'Porch ${release!.version} is out. You have $current.',
+            UpdateState.downloading =>
+              'Downloading ${release!.version}, '
+                  '${(updater.progress * 100).round()}%.',
+            UpdateState.installing =>
+              'Installing ${release!.version}. Porch will close and reopen.',
+            UpdateState.failed => updater.error ?? 'Something went wrong.',
+            UpdateState.idle =>
+              'Porch $current. Checks for new versions when it opens and '
+                  'twice a day.',
+          };
+          final available = updater.state == UpdateState.available;
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _SectionHeading(
+                'Updates',
+                description,
+                trailing: Wrap(
+                  spacing: 10,
+                  children: [
+                    if (available)
+                      FilledButton(
+                        onPressed: updater.install,
+                        child: Text(
+                          updater.installsInApp
+                              ? 'Install update'
+                              : 'Open on GitHub',
+                        ),
+                      ),
+                    OutlinedButton(
+                      onPressed: updater.busy ? null : () => updater.check(),
+                      child: const Text('Check for updates'),
+                    ),
+                  ],
+                ),
+              ),
+              if (updater.state == UpdateState.downloading) ...[
+                const SizedBox(height: 16),
+                LinearProgressIndicator(
+                  value: updater.progress,
+                  color: p.accent,
+                  backgroundColor: p.track,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ],
+              if (available && release!.notes.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text(
+                  "What's new",
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: p.muted,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(release.notes, style: const TextStyle(height: 1.45)),
+              ],
+            ],
           );
         },
       ),
