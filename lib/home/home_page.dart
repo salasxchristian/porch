@@ -7,6 +7,7 @@ import '../ha/ha_entity.dart';
 import '../settings/app_settings.dart';
 import '../theme.dart';
 import '../widgets/common.dart';
+import '../widgets/device_details.dart';
 import '../widgets/device_widgets.dart';
 
 class HomePage extends StatefulWidget {
@@ -199,6 +200,10 @@ class _HomePageState extends State<HomePage> {
                           trailing: _editing
                               ? _UnpinButton(entity: e, settings: settings)
                               : null,
+                          onOpen: _editing
+                              ? null
+                              : () =>
+                                    showDeviceDetails(context, ha, e.entityId),
                         ),
                       ],
                     ],
@@ -295,7 +300,13 @@ class _DevicesSection extends StatelessWidget {
                             next: i < tiles.length - 1 ? tiles[i + 1] : null,
                             settings: settings,
                           )
-                        : DeviceTile(entity: e, area: ha.areaName(e), ha: ha),
+                        : DeviceTile(
+                            entity: e,
+                            area: ha.areaName(e),
+                            ha: ha,
+                            onOpen: () =>
+                                showDeviceDetails(context, ha, e.entityId),
+                          ),
                   ),
                 if (editing)
                   SizedBox(

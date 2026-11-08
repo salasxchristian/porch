@@ -71,11 +71,22 @@ class HaEntity {
     return (b * 100 / 255).round().clamp(1, 100);
   }
 
+  /// A list attribute such as `hvac_modes` or `effect_list`, or empty.
+  List<String> listAttr(String key) =>
+      (attributes[key] as List? ?? const []).map((v) => '$v').toList();
+
+  List<String> get colorModes => listAttr('supported_color_modes');
+
+  bool get supportsColorTemp => colorModes.contains('color_temp');
+
+  bool get supportsColor => colorModes.any(
+    (m) => const {'hs', 'xy', 'rgb', 'rgbw', 'rgbww'}.contains(m),
+  );
+
   num? get targetTemperature => attributes['temperature'] as num?;
   num? get currentTemperature => attributes['current_temperature'] as num?;
   String? get hvacAction => attributes['hvac_action'] as String?;
-  List<String> get hvacModes =>
-      (attributes['hvac_modes'] as List? ?? const []).cast<String>();
+  List<String> get hvacModes => listAttr('hvac_modes');
 
   String get stateLabel {
     if (!available) return 'Unavailable';
@@ -101,11 +112,18 @@ class HaEntity {
         if (action == 'cooling' && target != null) {
           return 'Cooling to ${_deg(target)}';
         }
-        return target != null
-            ? '${_capitalize(state)}, set to ${_deg(target)}'
-            : _capitalize(state);
+        final low = attributes['target_temp_low'] as num?;
+        final high = attributes['target_temp_high'] as num?;
+        final mode = hvacLabel(state);
+        if (target != null) return '$mode, set to ${_deg(target)}';
+        if (low != null && high != null) {
+          return '$mode, ${_deg(low)} to ${_deg(high)}';
+        }
+        return mode;
       case 'scene':
         return 'Scene';
+      case 'media_player':
+        if (state == 'playing' || state == 'paused') return _capitalize(state);
     }
     if (!isOn) return 'Off';
     final pct = brightnessPct;
@@ -140,6 +158,13 @@ class HaEntity {
       areaId: areaId,
     );
   }
+
+  /// A readable name for a thermostat mode such as `heat_cool`.
+  static String hvacLabel(String mode) => switch (mode) {
+    'heat_cool' => 'Heat and cool',
+    'fan_only' => 'Fan only',
+    final m => _capitalize(m.replaceAll('_', ' ')),
+  };
 
   static String _deg(num t) =>
       '${t % 1 == 0 ? t.toInt() : t.toStringAsFixed(1)}°';

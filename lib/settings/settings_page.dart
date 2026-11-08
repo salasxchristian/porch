@@ -346,7 +346,7 @@ class _DeviceRow extends StatelessWidget {
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size(0, 36),
                     backgroundColor: pinned ? p.onSoft : Colors.transparent,
-                    foregroundColor: pinned ? p.onInk : p.muted,
+                    foregroundColor: pinned ? p.pillInk : p.muted,
                     side: BorderSide(color: pinned ? p.onBorder : p.strong),
                     textStyle: const TextStyle(
                       fontSize: 13,
@@ -376,27 +376,56 @@ class _AppearanceSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const _SectionHeading(
+          _SectionHeading(
             'Appearance',
-            'Pick a color theme for the whole app.',
+            "Pick a color theme, and light or dark. Automatic follows the "
+                "computer's setting.",
+            trailing: ListenableBuilder(
+              listenable: settings,
+              builder: (context, _) => SegmentedButton<ThemeMode>(
+                showSelectedIcon: false,
+                segments: const [
+                  ButtonSegment(
+                    value: ThemeMode.light,
+                    icon: Icon(Icons.light_mode_outlined, size: 18),
+                    label: Text('Light'),
+                  ),
+                  ButtonSegment(
+                    value: ThemeMode.dark,
+                    icon: Icon(Icons.dark_mode_outlined, size: 18),
+                    label: Text('Dark'),
+                  ),
+                  ButtonSegment(
+                    value: ThemeMode.system,
+                    icon: Icon(Icons.brightness_auto_outlined, size: 18),
+                    label: Text('Automatic'),
+                  ),
+                ],
+                selected: {settings.appearance},
+                onSelectionChanged: (s) => settings.setAppearance(s.first),
+              ),
+            ),
           ),
           const SizedBox(height: 16),
           ListenableBuilder(
             listenable: settings,
-            builder: (context, _) => Row(
-              children: [
-                for (final (i, palette) in PorchPalette.all.indexed) ...[
-                  if (i > 0) const SizedBox(width: 14),
-                  Expanded(
-                    child: _ThemeCard(
-                      palette: palette,
-                      selected: settings.themeId == palette.id,
-                      onTap: () => settings.setTheme(palette.id),
+            builder: (context, _) {
+              final dark = context.porch.isDark;
+              return Row(
+                children: [
+                  for (final (i, palette) in PorchPalette.all.indexed) ...[
+                    if (i > 0) const SizedBox(width: 14),
+                    Expanded(
+                      child: _ThemeCard(
+                        palette: PorchPalette.byId(palette.id, dark: dark),
+                        selected: settings.themeId == palette.id,
+                        onTap: () => settings.setTheme(palette.id),
+                      ),
                     ),
-                  ),
+                  ],
                 ],
-              ],
-            ),
+              );
+            },
           ),
         ],
       ),

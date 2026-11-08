@@ -32,10 +32,14 @@ class PorchPalette extends ThemeExtension<PorchPalette> {
     required this.darkCard,
     required this.darkLine,
     required this.darkMuted,
+    this.isDark = false,
   });
 
   final String id;
   final String label;
+
+  /// The dark-mode version of a theme shares its [id] with the light one.
+  final bool isDark;
 
   /// Page background.
   final Color bg;
@@ -171,10 +175,110 @@ class PorchPalette extends ThemeExtension<PorchPalette> {
     darkMuted: Color(0xFFD3C8DF),
   );
 
-  static const all = [sage, blue, lilac];
+  static const sageDark = PorchPalette(
+    id: 'sage',
+    label: 'Sage',
+    isDark: true,
+    bg: Color(0xFF141A16),
+    side: Color(0xFF1A221D),
+    sideCard: Color(0xFF243029),
+    surface: Color(0xFF1E2721),
+    border: Color(0xFF2C3830),
+    strong: Color(0xFF3B4840),
+    accent: Color(0xFF8FB89E),
+    accentInk: Color(0xFF10201A),
+    accentSoft: Color(0xFF25362C),
+    on: Color(0xFFFFB547),
+    onInk: Color(0xFF3A2600),
+    onSoft: Color(0xFF362B19),
+    onBorder: Color(0xFF6B5226),
+    muted: Color(0xFFA9B5AD),
+    ink: Color(0xFFEEF0E9),
+    navInk: Color(0xFFC9D2CC),
+    track: Color(0xFF3F4A43),
+    neutral: Color(0xFF29332D),
+    link: Color(0xFFA8CFB5),
+    pill: Color(0xFF3D2F17),
+    pillInk: Color(0xFFFFCF85),
+    dark: Color(0xFF0E1411),
+    darkCard: Color(0xFF151D18),
+    darkLine: Color(0xFF24302A),
+    darkMuted: Color(0xFFCBC3B5),
+  );
 
-  static PorchPalette byId(String? id) =>
-      all.firstWhere((p) => p.id == id, orElse: () => sage);
+  static const blueDark = PorchPalette(
+    id: 'blue',
+    label: 'Pastel blue',
+    isDark: true,
+    bg: Color(0xFF11161D),
+    side: Color(0xFF172029),
+    sideCard: Color(0xFF213040),
+    surface: Color(0xFF1A232D),
+    border: Color(0xFF28333F),
+    strong: Color(0xFF374451),
+    accent: Color(0xFF8DB4DC),
+    accentInk: Color(0xFF0E1E2E),
+    accentSoft: Color(0xFF213449),
+    on: Color(0xFFFFD27A),
+    onInk: Color(0xFF3A2A00),
+    onSoft: Color(0xFF37311D),
+    onBorder: Color(0xFF6E5C2A),
+    muted: Color(0xFFA6B3C2),
+    ink: Color(0xFFEAF0F6),
+    navInk: Color(0xFFC6D2DF),
+    track: Color(0xFF3A4654),
+    neutral: Color(0xFF242E3A),
+    link: Color(0xFFA9C9EA),
+    pill: Color(0xFF3B321A),
+    pillInk: Color(0xFFFFDC95),
+    dark: Color(0xFF0C1117),
+    darkCard: Color(0xFF131A22),
+    darkLine: Color(0xFF222D3A),
+    darkMuted: Color(0xFFC3CEDB),
+  );
+
+  static const lilacDark = PorchPalette(
+    id: 'lilac',
+    label: 'Lilac',
+    isDark: true,
+    bg: Color(0xFF17131D),
+    side: Color(0xFF1E1826),
+    sideCard: Color(0xFF2C2337),
+    surface: Color(0xFF221C2A),
+    border: Color(0xFF332A3E),
+    strong: Color(0xFF43394F),
+    accent: Color(0xFFB9A0E0),
+    accentInk: Color(0xFF22163A),
+    accentSoft: Color(0xFF33284A),
+    on: Color(0xFFF4AFC4),
+    onInk: Color(0xFF4A1426),
+    onSoft: Color(0xFF3B2430),
+    onBorder: Color(0xFF74404F),
+    muted: Color(0xFFB5AAC2),
+    ink: Color(0xFFF1ECF6),
+    navInk: Color(0xFFD3C9DE),
+    track: Color(0xFF463C52),
+    neutral: Color(0xFF2B2434),
+    link: Color(0xFFCDB8EE),
+    pill: Color(0xFF432633),
+    pillInk: Color(0xFFF8BFD1),
+    dark: Color(0xFF110D16),
+    darkCard: Color(0xFF18131F),
+    darkLine: Color(0xFF2A2234),
+    darkMuted: Color(0xFFD3C8DF),
+  );
+
+  static const all = [sage, blue, lilac];
+  static const allDark = [sageDark, blueDark, lilacDark];
+
+  static PorchPalette byId(String? id, {bool dark = false}) =>
+      (dark ? allDark : all).firstWhere(
+        (p) => p.id == id,
+        orElse: () => dark ? sageDark : sage,
+      );
+
+  /// The theme's brand color in light mode, used for the logo in both modes.
+  Color get brand => byId(id).accent;
 
   @override
   PorchPalette copyWith() => this;
@@ -191,15 +295,20 @@ extension PorchContext on BuildContext {
 
 /// [useGoogleFonts] is off in tests, which can't fetch fonts.
 ThemeData buildPorchTheme(PorchPalette p, {bool useGoogleFonts = true}) {
-  final scheme = ColorScheme.fromSeed(seedColor: p.accent).copyWith(
-    primary: p.accent,
-    onPrimary: p.accentInk,
-    surface: p.surface,
-    onSurface: p.ink,
-    onSurfaceVariant: p.muted,
-    outline: p.strong,
-    outlineVariant: p.border,
-  );
+  final scheme =
+      ColorScheme.fromSeed(
+        seedColor: p.accent,
+        brightness: p.isDark ? Brightness.dark : Brightness.light,
+      ).copyWith(
+        primary: p.accent,
+        onPrimary: p.accentInk,
+        surface: p.surface,
+        onSurface: p.ink,
+        surfaceContainerHighest: p.neutral,
+        onSurfaceVariant: p.muted,
+        outline: p.strong,
+        outlineVariant: p.border,
+      );
   final base = ThemeData(colorScheme: scheme);
   final textTheme = useGoogleFonts
       ? GoogleFonts.plusJakartaSansTextTheme(base.textTheme)
@@ -239,8 +348,21 @@ ThemeData buildPorchTheme(PorchPalette p, {bool useGoogleFonts = true}) {
     textButtonTheme: TextButtonThemeData(
       style: ButtonStyle(foregroundColor: WidgetStatePropertyAll(p.link)),
     ),
+    // Light: the selected segment is a raised surface. Dark: surfaces are too
+    // close in tone, so it takes the accent color instead.
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: SegmentedButton.styleFrom(
+        backgroundColor: p.side,
+        foregroundColor: p.ink,
+        selectedBackgroundColor: p.isDark ? p.accent : p.surface,
+        selectedForegroundColor: p.isDark ? p.accentInk : p.ink,
+        side: BorderSide(color: p.side),
+        minimumSize: const Size(0, 44),
+        textStyle: const TextStyle(fontWeight: FontWeight.w700),
+      ),
+    ),
     switchTheme: SwitchThemeData(
-      thumbColor: const WidgetStatePropertyAll(Colors.white),
+      thumbColor: WidgetStatePropertyAll(p.isDark ? p.ink : Colors.white),
       trackColor: WidgetStateProperty.resolveWith(
         (states) => states.contains(WidgetState.selected) ? p.accent : p.track,
       ),

@@ -10,6 +10,7 @@ class PorchCard extends StatelessWidget {
     this.padding = const EdgeInsets.all(20),
     this.color,
     this.borderColor,
+    this.onTap,
   });
 
   final Widget child;
@@ -17,17 +18,24 @@ class PorchCard extends StatelessWidget {
   final Color? color;
   final Color? borderColor;
 
+  /// Makes the whole card clickable. Buttons inside it still get their clicks.
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
     final p = context.porch;
-    return Container(
-      padding: padding,
-      decoration: BoxDecoration(
-        color: color ?? p.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderColor ?? p.border),
+    final radius = BorderRadius.circular(16);
+    return Material(
+      color: color ?? p.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: radius,
+        side: BorderSide(color: borderColor ?? p.border),
       ),
-      child: child,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: radius,
+        child: Padding(padding: padding, child: child),
+      ),
     );
   }
 }
@@ -201,7 +209,7 @@ class LogoMark extends StatelessWidget {
     final p = context.porch;
     return CustomPaint(
       size: Size.square(size),
-      painter: _LogoPainter(p.accent, p.on),
+      painter: _LogoPainter(p.brand, p.on),
     );
   }
 }

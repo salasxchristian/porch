@@ -5,18 +5,21 @@ import '../ha/ha_entity.dart';
 import '../theme.dart';
 import 'common.dart';
 
-/// A clickable card that switches a light, switch or similar on and off.
+/// A card for a light, switch or similar. Its switch turns it on and off;
+/// clicking the card calls [onOpen] when given, or toggles it otherwise.
 class DeviceTile extends StatelessWidget {
   const DeviceTile({
     super.key,
     required this.entity,
     required this.area,
     required this.ha,
+    this.onOpen,
   });
 
   final HaEntity entity;
   final String area;
   final HaClient ha;
+  final VoidCallback? onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -31,7 +34,7 @@ class DeviceTile extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
-        onTap: entity.available ? toggle : null,
+        onTap: onOpen ?? (entity.available ? toggle : null),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -81,11 +84,15 @@ class ClimateCard extends StatelessWidget {
     required this.entity,
     required this.ha,
     this.trailing,
+    this.onOpen,
   });
 
   final HaEntity entity;
   final HaClient ha;
   final Widget? trailing;
+
+  /// Called when the card itself (not one of its buttons) is clicked.
+  final VoidCallback? onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -94,6 +101,13 @@ class ClimateCard extends StatelessWidget {
     final step = entity.attributes['target_temp_step'] as num? ?? 1;
     final current = entity.currentTemperature;
     final action = entity.hvacAction;
+    final low = entity.attributes['target_temp_low'] as num?;
+    final high = entity.attributes['target_temp_high'] as num?;
+    final headline = target != null
+        ? '${_fmt(target)}°'
+        : low != null && high != null
+        ? '${_fmt(low)}° to ${_fmt(high)}°'
+        : HaEntity.hvacLabel(entity.state);
     Widget roundButton(String label, String tooltip, VoidCallback? onTap) =>
         Tooltip(
           message: tooltip,
@@ -110,6 +124,7 @@ class ClimateCard extends StatelessWidget {
           ),
         );
     return PorchCard(
+      onTap: onOpen,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -149,20 +164,20 @@ class ClimateCard extends StatelessWidget {
           const SizedBox(height: 14),
           Row(
             children: [
-              roundButton(
-                '-',
-                'Lower temperature',
-                target == null
-                    ? null
-                    : () => ha.setTemperature(entity, target - step),
-              ),
+              if (target != null)
+                roundButton(
+                  '-',
+                  'Lower temperature',
+                  () => ha.setTemperature(entity, target - step),
+                ),
               Expanded(
                 child: Column(
                   children: [
                     Text(
-                      target == null ? entity.stateLabel : '${_fmt(target)}°',
+                      headline,
+                      textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: target == null ? 20 : 44,
+                        fontSize: target == null ? 30 : 44,
                         fontWeight: FontWeight.w800,
                         height: 1,
                       ),
@@ -177,13 +192,12 @@ class ClimateCard extends StatelessWidget {
                   ],
                 ),
               ),
-              roundButton(
-                '+',
-                'Raise temperature',
-                target == null
-                    ? null
-                    : () => ha.setTemperature(entity, target + step),
-              ),
+              if (target != null)
+                roundButton(
+                  '+',
+                  'Raise temperature',
+                  () => ha.setTemperature(entity, target + step),
+                ),
             ],
           ),
         ],
@@ -202,11 +216,15 @@ class ActionCard extends StatelessWidget {
     required this.entity,
     required this.ha,
     this.trailing,
+    this.onOpen,
   });
 
   final HaEntity entity;
   final HaClient ha;
   final Widget? trailing;
+
+  /// Called when the card itself (not one of its buttons) is clicked.
+  final VoidCallback? onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -216,6 +234,7 @@ class ActionCard extends StatelessWidget {
         ? (entity.isOn ? 'Unlock' : 'Lock')
         : (entity.isOn ? 'Close' : 'Open');
     return PorchCard(
+      onTap: onOpen,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
         children: [
@@ -266,11 +285,20 @@ class ActionCard extends StatelessWidget {
 }
 
 /// The right card for any non-toggle entity Porch shows on its own.
-Widget controlCardFor(HaEntity e, HaClient ha, {Widget? trailing}) =>
-    switch (e.domain) {
-      'climate' => ClimateCard(entity: e, ha: ha, trailing: trailing),
-      _ => ActionCard(entity: e, ha: ha, trailing: trailing),
-    };
+Widget controlCardFor(
+  HaEntity e,
+  HaClient ha, {
+  Widget? trailing,
+  VoidCallback? onOpen,
+}) => switch (e.domain) {
+  'climate' => ClimateCard(
+    entity: e,
+    ha: ha,
+    trailing: trailing,
+    onOpen: onOpen,
+  ),
+  _ => ActionCard(entity: e, ha: ha, trailing: trailing, onOpen: onOpen),
+};
 
 /// Domains that get their own card instead of a toggle tile.
 const cardDomains = {'climate', 'lock', 'cover'};

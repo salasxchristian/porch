@@ -45,7 +45,6 @@ class _CamerasPageState extends State<CamerasPage> {
   @override
   Widget build(BuildContext context) {
     final scope = AppScope.of(context);
-    final p = context.porch;
     return ListenableBuilder(
       listenable: Listenable.merge([scope.cameras, scope.settings]),
       builder: (context, _) {
@@ -83,15 +82,6 @@ class _CamerasPageState extends State<CamerasPage> {
                     showSelectedIcon: false,
                     onSelectionChanged: (s) =>
                         scope.settings.setCameraLayout(s.first),
-                    style: SegmentedButton.styleFrom(
-                      backgroundColor: p.side,
-                      selectedBackgroundColor: p.surface,
-                      selectedForegroundColor: p.ink,
-                      foregroundColor: p.ink,
-                      side: BorderSide(color: p.side),
-                      minimumSize: const Size(0, 44),
-                      textStyle: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
                   ),
                 OutlinedButton(
                   onPressed: () => showManageCameras(context, scope.cameras),

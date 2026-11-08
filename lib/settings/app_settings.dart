@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
@@ -16,6 +17,9 @@ class AppSettings extends ChangeNotifier {
   final File file;
 
   String themeId = 'sage';
+
+  /// Light, dark, or following the computer's setting.
+  ThemeMode appearance = ThemeMode.system;
   String haUrl = '';
   String haToken = '';
   Set<String> shown = {};
@@ -39,6 +43,10 @@ class AppSettings extends ChangeNotifier {
       final json =
           jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       themeId = json['theme'] as String? ?? themeId;
+      appearance = ThemeMode.values.firstWhere(
+        (m) => m.name == json['appearance'],
+        orElse: () => ThemeMode.system,
+      );
       haUrl = json['haUrl'] as String? ?? '';
       haToken = json['haToken'] as String? ?? '';
       shown = {...(json['shown'] as List? ?? []).cast<String>()};
@@ -57,6 +65,9 @@ class AppSettings extends ChangeNotifier {
   }
 
   Future<void> setTheme(String id) => _update(() => themeId = id);
+
+  Future<void> setAppearance(ThemeMode mode) =>
+      _update(() => appearance = mode);
 
   Future<void> setConnection(String url, String token) => _update(() {
     haUrl = url.trim().replaceAll(RegExp(r'/+$'), '');
@@ -104,6 +115,7 @@ class AppSettings extends ChangeNotifier {
     await tmp.writeAsString(
       const JsonEncoder.withIndent('  ').convert({
         'theme': themeId,
+        'appearance': appearance.name,
         'haUrl': haUrl,
         'haToken': haToken,
         'shown': shown.toList()..sort(),

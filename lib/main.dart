@@ -57,8 +57,13 @@ class _PorchAppState extends State<PorchApp> {
         builder: (context, _) => MaterialApp(
           title: 'Porch',
           debugShowCheckedModeBanner: false,
+          themeMode: widget.settings.appearance,
           theme: buildPorchTheme(
             PorchPalette.byId(widget.settings.themeId),
+            useGoogleFonts: widget.useGoogleFonts,
+          ),
+          darkTheme: buildPorchTheme(
+            PorchPalette.byId(widget.settings.themeId, dark: true),
             useGoogleFonts: widget.useGoogleFonts,
           ),
           home: const PorchShell(),
