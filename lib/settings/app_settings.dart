@@ -26,6 +26,9 @@ class AppSettings extends ChangeNotifier {
   List<String> pinned = [];
   CameraLayout cameraLayout = CameraLayout.spotlight;
 
+  /// Whether the other-cameras panel is tucked away on the full-size view.
+  bool cameraPanelHidden = false;
+
   bool get hasConnection => haUrl.isNotEmpty && haToken.isNotEmpty;
 
   static Future<AppSettings> open() async {
@@ -58,6 +61,7 @@ class AppSettings extends ChangeNotifier {
         (l) => l.name == json['cameraLayout'],
         orElse: () => CameraLayout.spotlight,
       );
+      cameraPanelHidden = json['cameraPanelHidden'] as bool? ?? false;
     } on FormatException {
       // Keep defaults when the file is unreadable.
     }
@@ -76,6 +80,9 @@ class AppSettings extends ChangeNotifier {
 
   Future<void> setCameraLayout(CameraLayout layout) =>
       _update(() => cameraLayout = layout);
+
+  Future<void> setCameraPanelHidden(bool hidden) =>
+      _update(() => cameraPanelHidden = hidden);
 
   /// Hiding an entity also takes it off Home.
   Future<void> setShown(String id, bool show) => _update(() {
@@ -121,6 +128,7 @@ class AppSettings extends ChangeNotifier {
         'shown': shown.toList()..sort(),
         'pinned': pinned,
         'cameraLayout': cameraLayout.name,
+        'cameraPanelHidden': cameraPanelHidden,
       }),
     );
     await tmp.rename(file.path);

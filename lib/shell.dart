@@ -24,7 +24,10 @@ class PorchShell extends StatelessWidget {
         builder: (context, page, _) => Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _Sidebar(page: page, onSelect: (p) => scope.page.value = p),
+            if (useNavRail(context))
+              _Rail(page: page, onSelect: (p) => scope.page.value = p)
+            else
+              _Sidebar(page: page, onSelect: (p) => scope.page.value = p),
             Expanded(
               child: switch (page) {
                 PorchPage.home => const HomePage(),
@@ -147,6 +150,14 @@ class _NavItem extends StatelessWidget {
   }
 }
 
+(String, bool) _connection(HaStatus status) => switch (status) {
+  HaStatus.connected => ('Connected', true),
+  HaStatus.connecting => ('Connecting', false),
+  HaStatus.notConfigured => ('Not set up', false),
+  HaStatus.authFailed => ('Token rejected', false),
+  HaStatus.unreachable => ('Can\'t reach it. Retrying.', false),
+};
+
 class _ConnectionCard extends StatelessWidget {
   const _ConnectionCard();
 
@@ -157,13 +168,7 @@ class _ConnectionCard extends StatelessWidget {
     return ListenableBuilder(
       listenable: ha,
       builder: (context, _) {
-        final (label, ok) = switch (ha.status) {
-          HaStatus.connected => ('Connected', true),
-          HaStatus.connecting => ('Connecting', false),
-          HaStatus.notConfigured => ('Not set up', false),
-          HaStatus.authFailed => ('Token rejected', false),
-          HaStatus.unreachable => ('Can\'t reach it. Retrying.', false),
-        };
+        final (label, ok) = _connection(ha.status);
         return Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -285,6 +290,238 @@ class _UpdateCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(4),
                   ),
               ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Narrow navigation for a portrait window: icons with short labels, so the
+/// page gets the width.
+class _Rail extends StatelessWidget {
+  const _Rail({required this.page, required this.onSelect});
+
+  final PorchPage page;
+  final ValueChanged<PorchPage> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.porch;
+    Widget item(PorchPage target, IconData icon, String label) => _RailItem(
+      icon: icon,
+      label: label,
+      selected: page == target,
+      onTap: () => onSelect(target),
+    );
+    return Container(
+      width: 92,
+      color: p.side,
+      padding: const EdgeInsets.fromLTRB(10, 20, 10, 20),
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 18),
+            child: Semantics(label: 'Porch', child: const LogoMark(size: 40)),
+          ),
+          item(PorchPage.home, Icons.home_outlined, 'Home'),
+          const SizedBox(height: 6),
+          item(PorchPage.cameras, Icons.videocam_outlined, 'Cameras'),
+          const SizedBox(height: 6),
+          item(PorchPage.rooms, Icons.lightbulb_outline, 'Rooms'),
+          const Spacer(),
+          const _RailUpdate(),
+          item(PorchPage.settings, Icons.tune, 'Settings'),
+          const SizedBox(height: 12),
+          const _RailConnection(),
+        ],
+      ),
+    );
+  }
+}
+
+class _RailItem extends StatelessWidget {
+  const _RailItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.porch;
+    return Semantics(
+      selected: selected,
+      button: true,
+      child: Material(
+        color: selected ? p.surface : Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        elevation: selected ? 0.5 : 0,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: SizedBox(
+            width: 72,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(0, 10, 0, 8),
+              child: Column(
+                children: [
+                  Icon(icon, size: 22, color: selected ? p.accent : p.navInk),
+                  const SizedBox(height: 4),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                      color: selected ? p.ink : p.navInk,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Home Assistant status as a dot, with the full wording on hover.
+class _RailConnection extends StatelessWidget {
+  const _RailConnection();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.porch;
+    final ha = AppScope.of(context).ha;
+    return ListenableBuilder(
+      listenable: ha,
+      builder: (context, _) {
+        final (label, ok) = _connection(ha.status);
+        return Tooltip(
+          message: 'Home Assistant: $label',
+          child: Container(
+            width: 72,
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            decoration: BoxDecoration(
+              color: p.sideCard,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: ok ? p.accent : null,
+                    border: ok ? null : Border.all(color: p.muted, width: 2),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  ok ? 'HA on' : 'HA off',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: p.muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// The update offer, shrunk to one button for the rail.
+class _RailUpdate extends StatelessWidget {
+  const _RailUpdate();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.porch;
+    final updater = AppScope.of(context).updater;
+    return ListenableBuilder(
+      listenable: updater,
+      builder: (context, _) {
+        final release = updater.latest;
+        if (release == null ||
+            !const {
+              UpdateState.available,
+              UpdateState.downloading,
+              UpdateState.installing,
+            }.contains(updater.state)) {
+          return const SizedBox();
+        }
+        final available = updater.state == UpdateState.available;
+        final message = switch (updater.state) {
+          UpdateState.downloading =>
+            'Downloading update, ${(updater.progress * 100).round()}%',
+          UpdateState.installing => 'Installing update',
+          _ =>
+            'Porch ${release.version} is out. '
+                '${updater.installsInApp ? 'Install' : 'Get'} it.',
+        };
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Tooltip(
+            message: message,
+            child: Material(
+              color: p.onSoft,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: p.onBorder),
+              ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: available ? updater.install : null,
+                child: SizedBox(
+                  width: 72,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(0, 10, 0, 8),
+                    child: Column(
+                      children: [
+                        if (available)
+                          Icon(
+                            Icons.system_update_alt,
+                            size: 20,
+                            color: p.pillInk,
+                          )
+                        else
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: p.accent,
+                              value: updater.state == UpdateState.downloading
+                                  ? updater.progress
+                                  : null,
+                            ),
+                          ),
+                        const SizedBox(height: 4),
+                        Text(
+                          available ? 'Update' : 'Updating',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
           ),
         );

@@ -120,7 +120,8 @@ class _CamerasPageState extends State<CamerasPage> {
           body = LayoutBuilder(
             builder: (context, box) {
               const gap = 16.0;
-              final cols = CamerasPage.columnsFor(cameras.length);
+              var cols = CamerasPage.columnsFor(cameras.length);
+              if (isPortrait(context) && cols > 2) cols = 2;
               final width = (box.maxWidth - gap * (cols - 1)) / cols;
               return Wrap(
                 spacing: gap,
@@ -143,42 +144,67 @@ class _CamerasPageState extends State<CamerasPage> {
             },
           );
         } else {
-          body = Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: CameraTile(
-                    key: ValueKey('featured-${featured.id}'),
-                    camera: featured,
-                    large: true,
-                    onOpen: () => open(featured),
+          final featuredTile = AspectRatio(
+            aspectRatio: 16 / 9,
+            child: CameraTile(
+              key: ValueKey('featured-${featured.id}'),
+              camera: featured,
+              large: true,
+              onOpen: () => open(featured),
+            ),
+          );
+          Widget otherTile(Camera c) => AspectRatio(
+            aspectRatio: 16 / 9,
+            child: CameraTile(
+              key: ValueKey(c.id),
+              camera: c,
+              tooltip: 'Show ${c.name} large',
+              onOpen: () => setState(() => _featuredId = c.id),
+            ),
+          );
+          if (isPortrait(context)) {
+            // Portrait: the big camera across the top, the rest two by two.
+            body = Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                featuredTile,
+                const SizedBox(height: 20),
+                LayoutBuilder(
+                  builder: (context, box) {
+                    const gap = 12.0;
+                    final width = (box.maxWidth - gap) / 2;
+                    return Wrap(
+                      spacing: gap,
+                      runSpacing: gap,
+                      children: [
+                        for (final c in others)
+                          SizedBox(width: width, child: otherTile(c)),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            );
+          } else {
+            body = Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: featuredTile),
+                const SizedBox(width: 20),
+                SizedBox(
+                  width: 300,
+                  child: Column(
+                    children: [
+                      for (final c in others) ...[
+                        otherTile(c),
+                        const SizedBox(height: 12),
+                      ],
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(width: 20),
-              SizedBox(
-                width: 300,
-                child: Column(
-                  children: [
-                    for (final c in others) ...[
-                      AspectRatio(
-                        aspectRatio: 16 / 9,
-                        child: CameraTile(
-                          key: ValueKey(c.id),
-                          camera: c,
-                          tooltip: 'Show ${c.name} large',
-                          onOpen: () => setState(() => _featuredId = c.id),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          );
+              ],
+            );
+          }
         }
         return PageBody(children: [header, const SizedBox(height: 24), body]);
       },
@@ -292,176 +318,290 @@ class CameraFocusPage extends StatefulWidget {
 class _CameraFocusPageState extends State<CameraFocusPage> {
   late Camera _camera = widget.initial;
 
+  /// Keeps the player alive when hiding the panel moves the video to a new
+  /// parent, so the stream doesn't reconnect.
+  final _videoKey = GlobalKey();
+
+  static const _cream = Color(0xFFFFF4E4);
+
   @override
   Widget build(BuildContext context) {
+    final settings = AppScope.of(context).settings;
+    return ListenableBuilder(
+      listenable: settings,
+      builder: (context, _) => _build(context, settings),
+    );
+  }
+
+  Widget _build(BuildContext context, AppSettings settings) {
     final p = context.porch;
-    const cream = Color(0xFFFFF4E4);
+    final portrait = isPortrait(context);
     final others = widget.cameras.where((c) => c.id != _camera.id).toList();
-    Widget pill({required Widget child}) => Container(
-      height: 44,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
+    final canHide = others.isNotEmpty;
+    final panel = canHide && !settings.cameraPanelHidden;
+    void togglePanel() {
+      if (canHide) settings.setCameraPanelHidden(panel);
+    }
+
+    Widget pillButton({
+      required IconData icon,
+      required String label,
+      required VoidCallback onTap,
+      String? tooltip,
+    }) {
+      final button = Material(
         color: const Color(0x99000000),
         borderRadius: BorderRadius.circular(22),
-      ),
-      child: child,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: onTap,
+          child: SizedBox(
+            height: 44,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 18, 0),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, color: _cream, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      color: _cream,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      return tooltip == null
+          ? button
+          : Tooltip(message: tooltip, child: button);
+    }
+
+    final video = Stack(
+      key: _videoKey,
+      fit: StackFit.expand,
+      children: [
+        CameraVideo(
+          key: ValueKey(_camera.id),
+          url: _camera.bestUrl,
+          fit: BoxFit.contain,
+        ),
+        Positioned(
+          left: 20,
+          top: 20,
+          right: 20,
+          child: Row(
+            children: [
+              pillButton(
+                icon: Icons.arrow_back,
+                label: 'All cameras',
+                onTap: () => Navigator.of(context).pop(),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    height: 44,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0x99000000),
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                    child: Center(
+                      widthFactor: 1,
+                      child: Text(
+                        _camera.name,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: _cream,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              if (canHide) ...[
+                const SizedBox(width: 12),
+                Semantics(
+                  expanded: panel,
+                  child: pillButton(
+                    icon: portrait
+                        ? (panel
+                              ? Icons.keyboard_arrow_down
+                              : Icons.keyboard_arrow_up)
+                        : (panel ? Icons.chevron_right : Icons.chevron_left),
+                    label: panel ? 'Hide cameras' : 'Show cameras',
+                    tooltip: panel
+                        ? 'Hide the cameras panel (C)'
+                        : 'Show the cameras panel (C)',
+                    onTap: togglePanel,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        Positioned(
+          left: 20,
+          bottom: 18,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0x8C000000),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              canHide
+                  ? 'Esc to go back | C to ${panel ? 'hide' : 'show'} cameras'
+                  : 'Press Esc to go back',
+              style: TextStyle(
+                color: p.darkMuted,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
+
+    final heading = Text(
+      'OTHER CAMERAS',
+      style: TextStyle(
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        letterSpacing: 0.5,
+        color: p.darkMuted,
+      ),
+    );
+
+    final Widget body;
+    if (portrait) {
+      // Video across the top, the other cameras as tiles underneath.
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (panel) ...[
+            AspectRatio(aspectRatio: 16 / 9, child: video),
+            Expanded(
+              child: Container(
+                color: p.dark,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(28, 28, 28, 32),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      heading,
+                      const SizedBox(height: 12),
+                      LayoutBuilder(
+                        builder: (context, box) {
+                          const gap = 16.0;
+                          final width = (box.maxWidth - gap) / 2;
+                          return Wrap(
+                            spacing: gap,
+                            runSpacing: gap,
+                            children: [
+                              for (final c in others)
+                                SizedBox(
+                                  width: width,
+                                  child: AspectRatio(
+                                    aspectRatio: 16 / 9,
+                                    child: CameraTile(
+                                      key: ValueKey('panel-${c.id}'),
+                                      camera: c,
+                                      tooltip: 'Switch to ${c.name}',
+                                      onOpen: () => setState(() => _camera = c),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ] else
+            Expanded(child: video),
+        ],
+      );
+    } else {
+      body = Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(child: video),
+          if (panel)
+            Container(
+              width: 300,
+              color: p.dark,
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    heading,
+                    const SizedBox(height: 10),
+                    for (final c in others)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Material(
+                          color: p.darkCard,
+                          borderRadius: BorderRadius.circular(12),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () => setState(() => _camera = c),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.videocam_outlined,
+                                    color: p.darkMuted,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      c.name,
+                                      style: const TextStyle(
+                                        color: _cream,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      );
+    }
+
     return CallbackShortcuts(
       bindings: {
         const SingleActivator(LogicalKeyboardKey.escape): () =>
             Navigator.of(context).pop(),
+        const SingleActivator(LogicalKeyboardKey.keyC): togglePanel,
       },
       child: Focus(
         autofocus: true,
-        child: Scaffold(
-          backgroundColor: Colors.black,
-          body: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    CameraVideo(
-                      key: ValueKey(_camera.id),
-                      url: _camera.bestUrl,
-                      fit: BoxFit.contain,
-                    ),
-                    Positioned(
-                      left: 20,
-                      top: 20,
-                      child: Row(
-                        children: [
-                          Material(
-                            color: const Color(0x99000000),
-                            borderRadius: BorderRadius.circular(22),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(22),
-                              onTap: () => Navigator.of(context).pop(),
-                              child: const SizedBox(
-                                height: 44,
-                                child: Padding(
-                                  padding: EdgeInsets.fromLTRB(14, 0, 18, 0),
-                                  child: Row(
-                                    children: [
-                                      Icon(
-                                        Icons.arrow_back,
-                                        color: cream,
-                                        size: 18,
-                                      ),
-                                      SizedBox(width: 8),
-                                      Text(
-                                        'All cameras',
-                                        style: TextStyle(
-                                          color: cream,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          pill(
-                            child: Center(
-                              child: Text(
-                                _camera.name,
-                                style: const TextStyle(
-                                  color: cream,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Positioned(
-                      left: 20,
-                      bottom: 18,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0x8C000000),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          'Press Esc to go back',
-                          style: TextStyle(
-                            color: p.darkMuted,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (others.isNotEmpty)
-                Container(
-                  width: 300,
-                  color: p.dark,
-                  padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'OTHER CAMERAS',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.5,
-                          color: p.darkMuted,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      for (final c in others)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Material(
-                            color: p.darkCard,
-                            borderRadius: BorderRadius.circular(12),
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(12),
-                              onTap: () => setState(() => _camera = c),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.videocam_outlined,
-                                      color: p.darkMuted,
-                                      size: 20,
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        c.name,
-                                        style: const TextStyle(
-                                          color: cream,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
-        ),
+        child: Scaffold(backgroundColor: Colors.black, body: body),
       ),
     );
   }

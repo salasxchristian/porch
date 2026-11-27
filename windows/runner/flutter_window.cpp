@@ -65,10 +65,11 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
 
   switch (message) {
     case WM_GETMINMAXINFO: {
-      // Keep the window big enough for the sidebar and two columns.
+      // Narrow enough for a maximized window on a portrait monitor, even at
+      // 150% scaling; Porch switches to its narrow layout below 1000 wide.
       auto* info = reinterpret_cast<MINMAXINFO*>(lparam);
       const UINT dpi = FlutterDesktopGetDpiForHWND(hwnd);
-      info->ptMinTrackSize.x = MulDiv(1100, dpi, 96);
+      info->ptMinTrackSize.x = MulDiv(720, dpi, 96);
       info->ptMinTrackSize.y = MulDiv(720, dpi, 96);
       return 0;
     }

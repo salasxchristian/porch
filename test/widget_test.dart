@@ -61,6 +61,17 @@ void main() {
     );
   });
 
+  testWidgets('a portrait window uses the narrow rail', (tester) async {
+    await pumpApp(tester);
+    tester.view.physicalSize = const Size(1080, 1920);
+    await tester.pumpAndSettle();
+    expect(find.text('HA off'), findsOneWidget);
+    expect(find.text('Not set up'), findsNothing);
+    await tester.tap(find.text('Settings'));
+    await tester.pumpAndSettle();
+    expect(find.text('Save and connect'), findsOneWidget);
+  });
+
   testWidgets('switching theme in Settings recolors the app', (tester) async {
     await pumpApp(tester);
     await tester.tap(find.text('Settings'));

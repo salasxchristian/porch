@@ -2,6 +2,18 @@ import 'package:flutter/material.dart';
 
 import '../theme.dart';
 
+/// True when the window is taller than it is wide, as when Porch is
+/// maximized on a portrait monitor.
+bool isPortrait(BuildContext context) {
+  final size = MediaQuery.sizeOf(context);
+  return size.height > size.width;
+}
+
+/// Whether the main navigation should be the slim icon rail: on a portrait
+/// window, or one too narrow for the full sidebar.
+bool useNavRail(BuildContext context) =>
+    isPortrait(context) || MediaQuery.sizeOf(context).width < 1000;
+
 /// A rounded surface with a hairline border.
 class PorchCard extends StatelessWidget {
   const PorchCard({

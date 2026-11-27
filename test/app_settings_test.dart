@@ -20,9 +20,11 @@ void main() {
     await s.setShown('light.a', true);
     await s.setPinned('light.a', true);
     await s.setCameraLayout(CameraLayout.grid);
+    await s.setCameraPanelHidden(true);
 
     final again = fresh();
     await again.load();
+    expect(again.cameraPanelHidden, isTrue);
     expect(again.themeId, 'lilac');
     expect(again.haUrl, 'http://ha.local:8123');
     expect(again.haToken, 'token');
